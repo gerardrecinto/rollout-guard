@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rollout-guard"
+version = "1.0.0"
+description = "Post-deploy release verification with rule-based auto-remediation and LLM fallback for unknown failure signatures"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "Gerard Recinto", email = "gerardrecinto@gmail.com"}]
+keywords = ["devops", "release", "rollback", "auto-remediation", "kubernetes", "sre"]
+
+[project.scripts]
+rollout-guard = "rolloutguard.cli:main"
+
+[project.urls]
+Repository = "https://github.com/gerardrecinto/rollout-guard"
+
+[tool.setuptools]
+packages = ["rolloutguard"]

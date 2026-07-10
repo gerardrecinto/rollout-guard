@@ -1,0 +1,5 @@
+[
+  {"ts": 1, "error_rate": 0.01, "p99_latency_ms": 240, "restarts": 4, "cpu_pct": 41, "mem_pct": 55},
+  {"ts": 2, "error_rate": 0.04, "p99_latency_ms": 610, "restarts": 5, "cpu_pct": 63, "mem_pct": 71},
+  {"ts": 3, "error_rate": 0.11, "p99_latency_ms": 1450, "restarts": 8, "cpu_pct": 88, "mem_pct": 92}
+]

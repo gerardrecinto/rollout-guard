@@ -1,0 +1,7 @@
+[
+  {"name": "error-spike", "action": "rollback", "metric": "error_rate", "threshold": 0.05},
+  {"name": "latency-regression", "action": "restart", "metric": "p99_latency_ms", "threshold": 800, "severity": "degraded"},
+  {"name": "crash-loop", "action": "rollback", "metric": "restarts", "threshold": 3},
+  {"name": "oom-kill", "action": "scale", "log_pattern": "OOMKilled"},
+  {"name": "cert-expiry", "action": "escalate", "log_pattern": "x509: certificate has expired"}
+]
