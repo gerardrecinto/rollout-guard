@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rollout-guard"
-version = "1.0.0"
+version = "1.1.0"
 description = "Post-deploy release verification with rule-based auto-remediation and LLM fallback for unknown failure signatures"
 readme = "README.md"
 requires-python = ">=3.9"
