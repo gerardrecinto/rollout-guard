@@ -19,7 +19,7 @@ def plan(finding, deployment, namespace):
     if action == "restart":
         return base + ["rollout", "restart", "deployment/%s" % deployment]
     if action == "scale":
-        replicas = finding.rule.threshold if finding.rule.metric == "replicas" else 2
+        replicas = finding.rule.scale_to if finding.rule.scale_to is not None else 2
         return base + ["scale", "deployment/%s" % deployment,
                        "--replicas=%d" % int(replicas)]
     return None  # escalate: no command, page a human

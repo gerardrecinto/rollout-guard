@@ -1,4 +1,5 @@
-from rolloutguard.rules import Rule, evaluate, VERDICT_HEALTHY, VERDICT_DEGRADED, VERDICT_FAILING
+from rolloutguard.rules import (Rule, evaluate, validate_rules,
+                                VERDICT_HEALTHY, VERDICT_DEGRADED, VERDICT_FAILING)
 from rolloutguard.signals import MetricSample, Window
 
 RULES = [
@@ -53,3 +54,27 @@ def test_rule_rejects_unknown_action():
     import pytest
     with pytest.raises(ValueError):
         Rule("bad", "delete-namespace", metric="error_rate", threshold=1)
+
+
+def test_validate_rules_clean_set_has_no_problems():
+    assert validate_rules(RULES) == []
+
+
+def test_validate_rules_flags_unknown_metric():
+    bad = [Rule("typo", "restart", metric="replicas", threshold=2)]
+    problems = validate_rules(bad)
+    assert len(problems) == 1
+    assert "unknown metric" in problems[0]
+
+
+def test_validate_rules_flags_duplicate_names():
+    dup = [Rule("dup", "restart", metric="cpu_pct", threshold=90),
+           Rule("dup", "rollback", metric="mem_pct", threshold=90)]
+    problems = validate_rules(dup)
+    assert any("duplicate rule name" in p for p in problems)
+
+
+def test_validate_rules_flags_metric_without_threshold():
+    no_threshold = [Rule("weird", "restart", metric="cpu_pct")]
+    problems = validate_rules(no_threshold)
+    assert any("no threshold" in p for p in problems)

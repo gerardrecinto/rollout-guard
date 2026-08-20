@@ -42,3 +42,15 @@ def test_failing_findings_ordered_before_degraded(tmp_path):
     failing = finding("error-spike", "rollback")
     results = remediate([degraded, failing], "api", "prod", str(audit), dry_run=True)
     assert results[0]["finding"]["rule"] == "error-spike"
+
+
+def test_plan_scale_uses_rule_scale_to():
+    f = finding("oom-kill", "scale", scale_to=6)
+    cmd = plan(f, "api", "prod")
+    assert cmd == ["kubectl", "-n", "prod", "scale", "deployment/api", "--replicas=6"]
+
+
+def test_plan_scale_defaults_to_two_replicas_when_unset():
+    f = finding("oom-kill", "scale")
+    cmd = plan(f, "api", "prod")
+    assert cmd == ["kubectl", "-n", "prod", "scale", "deployment/api", "--replicas=2"]
