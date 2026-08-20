@@ -47,10 +47,12 @@ Nothing runs until you pass `--execute`. Add `--llm-fallback` (with `ANTHROPIC_A
 
 ```json
 {"name": "error-spike", "action": "rollback", "metric": "error_rate", "threshold": 0.05}
-{"name": "oom-kill", "action": "scale", "log_pattern": "OOMKilled"}
+{"name": "oom-kill", "action": "scale", "log_pattern": "OOMKilled", "scale_to": 4}
 ```
 
 `severity` defaults to `failing` (exit code 1, remediation planned). Set `"severity": "degraded"` for symptoms that warrant a restart but not a page.
+
+`metric` must be one of `error_rate`, `p99_latency_ms`, `restarts`, `cpu_pct`, `mem_pct` (the fields on a metric sample); `restarts` is evaluated as a delta across the window, the rest as the window max. For a `scale` action, set `scale_to` to the target replica count; it defaults to `2` if omitted. Run `rollout-guard validate --rules rules.json` to catch a bad metric name, a missing threshold, or a duplicate rule name before pointing the tool at a real window.
 
 ## Safety model
 
@@ -65,5 +67,5 @@ Design reasoning in [docs/adr-001-safety-boundaries.md](docs/adr-001-safety-boun
 ## Development
 
 ```bash
-pip install pytest && pytest -q   # 14 tests, stdlib-only runtime, no dependencies
+pip install pytest && pytest -q   # 22 tests, stdlib-only runtime, no dependencies
 ```

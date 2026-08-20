@@ -41,3 +41,18 @@ def test_report_summarizes_audit(tmp_path, capsys):
     rc = main(["report", "--audit", str(audit)])
     assert rc == 0
     assert "error-spike" in capsys.readouterr().out
+
+
+def test_validate_clean_rules_exits_zero(tmp_path, capsys):
+    rules = write(tmp_path / "r.json", RULES)
+    rc = main(["validate", "--rules", rules])
+    assert rc == 0
+    assert "1 rule(s) OK" in capsys.readouterr().out
+
+
+def test_validate_bad_rules_exits_nonzero(tmp_path, capsys):
+    bad = [{"name": "typo", "action": "restart", "metric": "repllicas", "threshold": 2}]
+    rules = write(tmp_path / "r.json", bad)
+    rc = main(["validate", "--rules", rules])
+    assert rc == 1
+    assert "unknown metric" in capsys.readouterr().out

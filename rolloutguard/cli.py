@@ -28,6 +28,10 @@ def build_parser():
 
     report = sub.add_parser("report", help="summarize the audit trail")
     report.add_argument("--audit", default="rollout-guard-audit.jsonl")
+
+    validate = sub.add_parser("validate",
+        help="check rule definitions for structural errors before a live run")
+    validate.add_argument("--rules", required=True)
     return p
 
 
@@ -79,10 +83,24 @@ def cmd_report(args):
     return 0
 
 
+def cmd_validate(args):
+    ruleset = rules_mod.load_rules(args.rules)
+    problems = rules_mod.validate_rules(ruleset)
+    if problems:
+        for p in problems:
+            print("  [invalid] %s" % p)
+        print("%d rule(s), %d problem(s)" % (len(ruleset), len(problems)))
+        return 1
+    print("%d rule(s) OK" % len(ruleset))
+    return 0
+
+
 def main(argv=None):
     args = build_parser().parse_args(argv)
     if args.command == "check":
         return cmd_check(args)
+    if args.command == "validate":
+        return cmd_validate(args)
     return cmd_report(args)
 
 
