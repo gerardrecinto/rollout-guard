@@ -2,9 +2,12 @@
 
 Only consulted when the window is unhealthy but no rule explains why. The
 model classifies the signature and suggests one action from the same allowed
-set the rule engine uses; the suggestion is audited but never executed unless
-the operator passes --allow-llm-actions. Requires ANTHROPIC_API_KEY; without
-it the tool degrades to plain escalation.
+set the rule engine uses. The suggestion is written to the audit trail for
+the on-call and is never executed automatically; there is no flag that
+turns it into a live action. The path from "LLM guess" to "automated
+response" is a human promoting a repeated correct guess to a rule (see
+docs/adr-001-safety-boundaries.md). Requires ANTHROPIC_API_KEY; without it
+the tool degrades to plain escalation.
 """
 
 import json
