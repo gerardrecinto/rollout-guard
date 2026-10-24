@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rollout-guard: post-deploy checks that act</title>
+<meta name="description" content="Feed rollout-guard a post-deploy health window and see which rules fire and which kubectl commands it would plan. Dry-run only, running the real package in your browser.">
+<meta property="og:title" content="rollout-guard">
+<meta property="og:description" content="Post-deploy release verification with rule-based remediation. Dry-run by default, every decision audited.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230ea5e9'/%3E%3Cpath d='M16 6l9 4v6c0 5-4 8.5-9 10-5-1.500-9-5-9-10v-6z' fill='none' stroke='%23062a3d' stroke-width='2.600' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#f8fafc;--panel:#fff;--panel2:#f1f5f9;--line:#e2e8f0;--fg:#0f172a;--mute:#475569;--brand:#0369a1;--brand-bg:#e0f2fe;--ok:#047857;--ok-bg:#d1fae5;--err:#b91c1c;--err-bg:#fee2e2;--warn:#b45309;--warn-bg:#fef3c7;--code:#0b1220;--code-fg:#e2e8f0}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#070d1a;--panel:#0d1526;--panel2:#111c33;--line:#1e2b47;--fg:#e8eefc;--mute:#9fb0cc;--brand:#38bdf8;--brand-bg:#082f49;--ok:#34d399;--ok-bg:#06382b;--err:#fca5a5;--err-bg:#3b1212;--warn:#fcd34d;--warn-bg:#3a2a07}}
+:root[data-theme=dark]{--bg:#070d1a;--panel:#0d1526;--panel2:#111c33;--line:#1e2b47;--fg:#e8eefc;--mute:#9fb0cc;--brand:#38bdf8;--brand-bg:#082f49;--ok:#34d399;--ok-bg:#06382b;--err:#fca5a5;--err-bg:#3b1212;--warn:#fcd34d;--warn-bg:#3a2a07}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--brand)}
+code,pre,textarea,input,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+nav{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:56px;gap:12px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--fg);text-decoration:none}
+.logo i{width:22px;height:22px;border-radius:6px;background:#0ea5e9;display:inline-grid;place-items:center}
+.logo svg{width:14px;height:14px}
+nav .links{display:flex;gap:18px;align-items:center;font-size:14px}
+nav .links a{color:var(--mute);text-decoration:none}
+nav .links a:hover{color:var(--fg)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:10px;font-weight:600;text-decoration:none;border:1px solid var(--line);color:var(--fg);background:var(--panel);cursor:pointer;font-size:15px}
+.btn.primary{background:#0ea5e9;border-color:#0ea5e9;color:#032132}
+.btn.primary:hover{background:#38bdf8}
+.btn:focus-visible,textarea:focus-visible,button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #0ea5e9;outline-offset:2px}
+.hero{padding:72px 0 40px;text-align:center}
+.pill{display:inline-block;font-size:13px;color:var(--brand);background:var(--brand-bg);padding:4px 12px;border-radius:99px;margin-bottom:20px;font-weight:600}
+h1{font-size:clamp(34px,6vw,58px);line-height:1.08;margin:0 0 18px;letter-spacing:-.02em}
+h1 em{font-style:normal;color:var(--brand)}
+.lede{max-width:700px;margin:0 auto 28px;color:var(--mute);font-size:18px}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.stats{display:flex;gap:28px;justify-content:center;flex-wrap:wrap;margin-top:36px;color:var(--mute);font-size:14px}
+.stats b{display:block;color:var(--fg);font-size:22px}
+section{padding:56px 0}
+h2{font-size:clamp(26px,4vw,36px);margin:0 0 8px;letter-spacing:-.01em}
+.sub{color:var(--mute);margin:0 0 28px;max-width:720px}
+.lab{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:860px){.lab{grid-template-columns:minmax(0,1fr)}nav .links .hide-s{display:none}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0;margin-bottom:16px}
+.lab .card{margin-bottom:0}
+.card h3{margin:0;padding:12px 16px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{font:600 12px system-ui;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);cursor:pointer;text-transform:none;letter-spacing:0}
+.chip[aria-pressed=true]{background:var(--brand-bg);border-color:var(--brand);color:var(--brand)}
+.tools{display:flex;gap:6px;flex-wrap:wrap}
+.ta{display:block;width:100%;height:190px;border:0;border-bottom:1px solid var(--line);padding:12px 14px;font-size:12.5px;line-height:1.55;background:var(--code);color:var(--code-fg);resize:vertical;white-space:pre;overflow:auto}
+.ta.short{height:110px}
+.ta:last-child{border-bottom:0}
+.lbl{display:block;padding:8px 14px;font-size:12px;color:var(--mute);background:var(--panel2);border-bottom:1px solid var(--line)}
+.row{display:flex;gap:10px;padding:12px 14px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line)}
+.row label{font-size:12px;color:var(--mute)}
+.row input{background:var(--code);color:var(--code-fg);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;width:130px}
+.verdict{padding:18px 16px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--line)}
+.verdict .dot{width:14px;height:14px;border-radius:50%;flex:none}
+.verdict.healthy{background:var(--ok-bg)} .verdict.healthy .dot{background:#10b981} .verdict.healthy b{color:var(--ok)}
+.verdict.degraded{background:var(--warn-bg)} .verdict.degraded .dot{background:#f59e0b} .verdict.degraded b{color:var(--warn)}
+.verdict.failing{background:var(--err-bg)} .verdict.failing .dot{background:#ef4444} .verdict.failing b{color:var(--err)}
+.verdict b{font-size:20px;text-transform:uppercase;letter-spacing:.04em}
+.verdict span{color:var(--mute);font-size:14px}
+.sec{padding:14px 16px;border-bottom:1px solid var(--line)}
+.sec:last-child{border-bottom:0}
+.sec h4{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.fnd{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:14px;padding:4px 0}
+.fnd code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:12.5px}
+.tag{font:700 11px ui-monospace,monospace;padding:2px 8px;border-radius:6px}
+.tag.failing{background:var(--err-bg);color:var(--err)} .tag.degraded{background:var(--warn-bg);color:var(--warn)}
+.tag.act{background:var(--brand-bg);color:var(--brand)}
+.tag.skip{background:var(--panel2);color:var(--mute)}
+pre.cmd{margin:6px 0 0;background:var(--code);color:#a5f3fc;padding:10px 12px;border-radius:8px;font-size:12.5px;overflow-x:auto}
+pre.raw{margin:0;padding:12px 16px;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto}
+.dry{display:inline-block;margin-left:8px;font:700 11px ui-monospace,monospace;color:var(--ok);background:var(--ok-bg);padding:2px 8px;border-radius:6px}
+.status{padding:16px;color:var(--mute);font-size:14px}
+svg.chart{display:block;width:100%;height:auto}
+.note{font-size:13px;color:var(--mute);margin-top:12px}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media (max-width:860px){.steps{grid-template-columns:minmax(0,1fr)}}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
+.step .n{width:28px;height:28px;border-radius:8px;background:var(--brand-bg);color:var(--brand);display:grid;place-items:center;font-weight:700;margin-bottom:10px}
+.step h3{margin:0 0 6px;font-size:17px}
+.step p{margin:0;color:var(--mute);font-size:15px}
+.tw{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow-x:auto;max-width:100%}
+table{width:100%;min-width:560px;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);background:var(--panel2)}
+tr:last-child td{border-bottom:0}
+td:first-child{font-family:ui-monospace,monospace;font-weight:700;white-space:nowrap}
+.install pre{background:var(--code);color:var(--code-fg);padding:16px;border-radius:12px;overflow-x:auto;font-size:13.5px;margin:0 0 12px}
+.cols2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:860px){.cols2{grid-template-columns:minmax(0,1fr)}}
+.limits{background:var(--panel);border:1px solid var(--line);border-left:4px solid #f59e0b;border-radius:10px;padding:16px 20px}
+.limits ul{margin:8px 0 0;padding-left:20px;color:var(--mute)}
+footer{border-top:1px solid var(--line);padding:32px 0;color:var(--mute);font-size:14px}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a class="logo" href="#top"><i><svg viewBox="0 0 32 32" fill="none" stroke="#062a3d" stroke-width="3.2" stroke-linejoin="round"><path d="M16 5l10 4.500v6.500c0 5.500-4.200 9.500-10 11-5.800-1.500-10-5.500-10-11V9.500z"/></svg></i>rollout-guard</a>
+  <div class="links">
+    <a href="#try" class="hide-s">Try it</a>
+    <a href="#safety" class="hide-s">Safety model</a>
+    <a href="#install" class="hide-s">Install</a>
+    <a class="btn" href="https://github.com/gerardrecinto/rollout-guard">GitHub</a>
+  </div>
+</div></nav>
+
+<header class="hero" id="top"><div class="wrap">
+  <span class="pill">Open source. MIT. Dry-run by default.</span>
+  <h1>The same three <em>kubectl</em> commands, run in seconds, not 20 minutes after the page.</h1>
+  <p class="lede">rollout-guard watches a deployment's health window right after a release. Known failure signatures get a rollback, restart or scale. Unknown ones are escalated, never guessed at. Every decision lands in a JSONL audit trail.</p>
+  <div class="cta">
+    <a class="btn primary" href="#try">Run a failing release</a>
+    <a class="btn" href="#safety">See the safety model</a>
+  </div>
+  <div class="stats">
+    <div><b>4</b>actions, a closed set</div>
+    <div><b>0</b>dependencies at runtime</div>
+    <div><b>0</b>commands run from this page</div>
+  </div>
+</div></header>
+
+<section id="try"><div class="wrap">
+  <h2>Replay a bad release</h2>
+  <p class="sub">The real package runs in your browser through Pyodide. Pick a scenario or edit the metrics, rules and logs. It plans the commands and writes the audit trail. There is no cluster behind this page, so nothing executes.</p>
+  <div class="lab">
+    <div>
+      <div class="card">
+        <h3><span>Scenario</span>
+          <span class="tools" role="group" aria-label="Scenario">
+            <button class="chip" data-sc="failing" aria-pressed="true">Error spike</button>
+            <button class="chip" data-sc="oom" aria-pressed="false">OOM kill</button>
+            <button class="chip" data-sc="cert" aria-pressed="false">Cert expiry</button>
+            <button class="chip" data-sc="healthy" aria-pressed="false">Healthy</button>
+          </span>
+        </h3>
+        <label class="lbl" for="metrics">Metric samples (JSON, Prometheus or CloudWatch export shape)</label>
+        <textarea class="ta" id="metrics" spellcheck="false" wrap="off"></textarea>
+        <label class="lbl" for="logs">Log lines for the window</label>
+        <textarea class="ta short" id="logs" spellcheck="false" wrap="off"></textarea>
+        <div class="row">
+          <label for="dep">deployment</label><input id="dep" value="api">
+          <label for="ns">namespace</label><input id="ns" value="prod">
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3><span>Rules</span><span class="tools"><button class="chip" id="validate">Validate rules</button></span></h3>
+        <textarea class="ta" id="rules" spellcheck="false" wrap="off"></textarea>
+        <div class="sec" id="validate-out" hidden></div>
+      </div>
+    </div>
+    <div class="card" id="result" aria-live="polite">
+      <h3><span>Decision</span><span class="dry">DRY RUN. NOTHING EXECUTED.</span></h3>
+      <div class="status" id="boot">Loading the engine (about 10 MB the first time, cached after)...</div>
+    </div>
+  </div>
+  <p class="note">Execution is not wired to this page. The CLI only runs kubectl when you pass <code>--execute</code>. The LLM fallback needs an API key and is not called here.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>How it works</h2>
+  <p class="sub">About 380 lines of standard-library Python. You can read all of it in one sitting.</p>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><h3>Build a window</h3><p>Metric samples and log lines from the minutes after a deploy. Restart counters are compared as a delta across the window, so old restarts do not trigger a false rollback.</p></div>
+    <div class="step"><div class="n">2</div><h3>Match signatures</h3><p>Each rule is a metric threshold or a log pattern mapped to one action. The verdict is healthy, degraded or failing.</p></div>
+    <div class="step"><div class="n">3</div><h3>Plan one action per type</h3><p>Two rules that both want a rollback produce one rollback. Worst severity goes first. Every decision, including dry runs, is appended to the audit trail.</p></div>
+  </div>
+</div></section>
+
+<section id="safety"><div class="wrap">
+  <h2>Safety model</h2>
+  <p class="sub">The point is that it is boring to trust. These are properties of the code, not intentions.</p>
+  <div class="tw"><table><thead><tr><th>Property</th><th>What it means</th></tr></thead><tbody>
+    <tr><td>Dry-run default</td><td><code>--execute</code> is an explicit opt-in per invocation.</td></tr>
+    <tr><td>Closed action set</td><td>rollback, restart, scale or escalate. There is no path from a rule file or an LLM reply to an arbitrary shell command.</td></tr>
+    <tr><td>LLM suggests only</td><td>The fallback classification is validated against the same action set, audited, and never executed.</td></tr>
+    <tr><td>One action per type</td><td>Duplicate demands collapse, so a bad window cannot fire ten rollbacks.</td></tr>
+    <tr><td>Everything audited</td><td>Dry runs and escalations are written as replayable JSONL.</td></tr>
+  </tbody></table></div>
+  <p class="note">Design reasoning is in <a href="https://github.com/gerardrecinto/rollout-guard/blob/main/docs/adr-001-safety-boundaries.md">ADR 001</a>.</p>
+</div></section>
+
+<section id="install" class="install"><div class="wrap">
+  <h2>Run it on your own cluster</h2>
+  <p class="sub">Python 3.9 or later, standard library only.</p>
+  <div class="cols2">
+    <div>
+<pre>pip install git+https://github.com/gerardrecinto/rollout-guard
+
+rollout-guard validate --rules rules.json
+rollout-guard check \
+  --metrics metrics.json --rules rules.json \
+  --deployment api --namespace prod
+rollout-guard report</pre>
+    </div>
+    <div>
+<pre>[
+  {"name": "error-spike", "action": "rollback",
+   "metric": "error_rate", "threshold": 0.05},
+  {"name": "oom-kill", "action": "scale",
+   "log_pattern": "OOMKilled", "scale_to": 4}
+]</pre>
+      <p class="note">Add <code>--execute</code> to run the commands. Add <code>--llm-fallback</code> with <code>ANTHROPIC_API_KEY</code> set to classify degraded windows no rule explains.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="limits">
+    <strong>What this does not do</strong>
+    <ul>
+      <li>It reads exported samples. It does not scrape Prometheus or CloudWatch for you.</li>
+      <li>It acts on thresholds you wrote. A threshold that is wrong for your service is wrong here too.</li>
+      <li>It does not coordinate with a progressive-delivery controller. Use it as a check on top, not instead of canary analysis.</li>
+    </ul>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <span>rollout-guard. MIT licensed. Built by <a href="https://github.com/gerardrecinto">Gerard Recinto</a>.</span>
+  <span><a href="https://github.com/gerardrecinto/rollout-guard">Source</a> &middot; <a href="https://github.com/gerardrecinto/rollout-guard/blob/main/CHANGELOG.md">Changelog</a></span>
+</div></footer>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+(() => {
+  const PY_FILES = ["__init__.py", "signals.py", "rules.py", "remediate.py"];
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const SC = {};
+  let py = null, timer = null;
+  const track = (n) => { try { if (window.plausible) window.plausible(n); } catch (e) {} };
+
+  const PY = `
+import json
+from rolloutguard import signals, rules as R, remediate
+def _load(metrics, logs, rules):
+    samples = [signals.MetricSample(**r) for r in json.loads(metrics)]
+    rs = [R.Rule(**r) for r in json.loads(rules)]
+    lines = [l for l in logs.split("\\n") if l.strip()]
+    return samples, lines, rs
+def validate(rules):
+    rs = [R.Rule(**r) for r in json.loads(rules)]
+    return json.dumps(R.validate_rules(rs))
+def run(metrics, logs, rules, dep, ns):
+    samples, lines, rs = _load(metrics, logs, rules)
+    window = signals.Window(samples, lines)
+    verdict, findings = R.evaluate(window, rs)
+    path = "/tmp/audit.jsonl"
+    open(path, "w").close()
+    results = remediate.remediate(findings, dep, ns, path, dry_run=True) if verdict != R.VERDICT_HEALTHY else []
+    return json.dumps({
+        "verdict": verdict,
+        "findings": [f.as_dict() for f in findings],
+        "results": results,
+        "audit": open(path).read(),
+        "series": [{"ts": s.ts, "error_rate": s.error_rate, "p99": s.p99_latency_ms, "restarts": s.restarts} for s in samples],
+    })
+`;
+
+  function chart(series, rules) {
+    if (!series.length) return "";
+    const W = 440, H = 120, P = 28;
+    const th = rules.filter((r) => r.metric === "error_rate" && r.threshold != null).map((r) => r.threshold);
+    const max = Math.max(0.01, ...series.map((s) => s.error_rate), ...th) * 1.15;
+    const x = (i) => P + (series.length === 1 ? 0 : (i * (W - 2 * P)) / (series.length - 1));
+    const y = (v) => H - P / 1.4 - (v / max) * (H - P * 1.4);
+    const pts = series.map((s, i) => `${x(i)},${y(s.error_rate)}`).join(" ");
+    const lines = th.map((t) => `<line x1="${P}" x2="${W - P}" y1="${y(t)}" y2="${y(t)}" stroke="#ef4444" stroke-dasharray="4 4"/><text x="${W - P}" y="${y(t) - 4}" text-anchor="end" font-size="10" fill="#ef4444">limit ${t}</text>`).join("");
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Error rate across the window with the rule thresholds"><polyline points="${pts}" fill="none" stroke="#0ea5e9" stroke-width="2.500"/>${series.map((s, i) => `<circle cx="${x(i)}" cy="${y(s.error_rate)}" r="3.500" fill="#0ea5e9"/>`).join("")}${lines}<text x="${P}" y="12" font-size="10" fill="currentColor" opacity=".7">error_rate across ${series.length} samples</text></svg>`;
+  }
+
+  function show(res, rules) {
+    const r = $("result");
+    const head = r.querySelector("h3").outerHTML;
+    if (res.error) { r.innerHTML = head + `<div class="status" style="color:var(--err)">${esc(res.error)}</div>`; return; }
+    const n = res.findings.length;
+    const blurb = res.verdict === "healthy" ? "No rule fired. Nothing to do." : `${n} finding${n === 1 ? "" : "s"}, ${res.results.length} action${res.results.length === 1 ? "" : "s"} planned`;
+    const ran = new Set(res.results.map((x) => x.finding.rule));
+    const finds = res.findings.map((f) => `<div class="fnd"><span class="tag ${f.severity}">${f.severity}</span><code>${esc(f.rule)}</code><span>wants ${f.action}</span>${ran.has(f.rule) ? '<span class="tag act">planned</span>' : '<span class="tag skip">collapsed into an earlier action</span>'}<span style="color:var(--mute);font-size:12.5px">${esc(JSON.stringify(f.evidence))}</span></div>`).join("");
+    const plan = res.results.map((x) => `<div class="fnd"><span class="tag act">${esc(x.finding.action)}</span><code>${esc(x.finding.rule)}</code></div>${x.outcome.cmd ? `<pre class="cmd">$ ${esc(x.outcome.cmd)}</pre>` : '<div class="note">Escalate: no command. This pages a human.</div>'}`).join("");
+    r.innerHTML = head +
+      `<div class="verdict ${res.verdict}"><i class="dot"></i><div><b>${res.verdict}</b><br><span>${blurb}</span></div></div>` +
+      `<div class="sec"><h4>Signal</h4>${chart(res.series, rules)}</div>` +
+      (n ? `<div class="sec"><h4>Rules that fired</h4>${finds}</div>` : "") +
+      (res.results.length ? `<div class="sec"><h4>Planned commands (not executed)</h4>${plan}</div>` : "") +
+      (res.audit ? `<div class="sec"><h4>Audit trail (JSONL)</h4></div><pre class="raw">${esc(res.audit.trim())}</pre>` : "");
+  }
+
+  function lint() {
+    if (!py) return;
+    let res, rules = [];
+    try { rules = JSON.parse($("rules").value); } catch (e) {}
+    try {
+      py.globals.set("_m", $("metrics").value); py.globals.set("_l", $("logs").value);
+      py.globals.set("_r", $("rules").value); py.globals.set("_d", $("dep").value || "app"); py.globals.set("_n", $("ns").value || "default");
+      res = JSON.parse(py.runPython("run(_m, _l, _r, _d, _n)"));
+    } catch (e) {
+      const m = String(e.message || e).trim().split("\n").pop();
+      res = { error: /JSON/i.test(m) ? "Could not read the JSON: " + m : m };
+    }
+    show(res, rules);
+  }
+
+  async function boot() {
+    try {
+      py = await loadPyodide();
+      py.FS.mkdirTree("/lib/rolloutguard");
+      await Promise.all(PY_FILES.map(async (f) => {
+        const r = await fetch("py/" + f);
+        if (!r.ok) throw new Error("could not load " + f);
+        py.FS.writeFile("/lib/rolloutguard/" + f, await r.text());
+      }));
+      py.runPython("import sys; sys.path.insert(0, '/lib')");
+      py.runPython(PY);
+      window.__RG_READY__ = true;
+      lint();
+    } catch (e) {
+      $("boot").textContent = "The in-browser engine did not load (" + e.message + "). The CLI install below behaves the same way.";
+    }
+  }
+
+  function setScenario(k) {
+    const s = SC[k]; if (!s) return;
+    $("metrics").value = s.metrics; $("logs").value = s.logs;
+    document.querySelectorAll("[data-sc]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.sc === k));
+    $("validate-out").hidden = true; lint(); track("rg_scenario_" + k);
+  }
+  document.querySelectorAll("[data-sc]").forEach((b) => b.addEventListener("click", () => setScenario(b.dataset.sc)));
+  ["metrics", "logs", "rules", "dep", "ns"].forEach((id) => $(id).addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(lint, 250); }));
+  $("validate").addEventListener("click", () => {
+    const o = $("validate-out"); o.hidden = false;
+    try {
+      const probs = JSON.parse(py.runPython(`validate(${JSON.stringify($("rules").value)})`));
+      o.innerHTML = probs.length ? probs.map((p) => `<div class="fnd"><span class="tag failing">invalid</span>${esc(p)}</div>`).join("") : '<span style="color:var(--ok);font-weight:600">Rules are structurally valid.</span>';
+    } catch (e) { o.innerHTML = `<span style="color:var(--err)">${esc(String(e.message || e).trim().split("\n").pop())}</span>`; }
+    track("rg_validate");
+  });
+
+  Promise.all(["rules.json", "metrics_failing.json", "metrics_healthy.json"].map((n) => fetch("examples/" + n).then((r) => r.text()))).then(([rules, failing, healthy]) => {
+    const fmt = (t) => t.trim();
+    SC.failing = { metrics: fmt(failing), logs: "" };
+    SC.healthy = { metrics: fmt(healthy), logs: "" };
+    SC.oom = { metrics: fmt(healthy), logs: "2026-06-01T10:02:11Z api-7d9 OOMKilled: container exceeded memory limit\n2026-06-01T10:02:14Z api-7d9 restarting" };
+    SC.cert = { metrics: fmt(healthy), logs: "2026-06-01T10:04:50Z api-7d9 tls: x509: certificate has expired or is not yet valid" };
+    $("rules").value = fmt(rules);
+    setScenario("failing");
+  }).catch(() => { $("metrics").value = "could not load examples"; });
+  boot();
+})();
+</script>
+</body>
+</html>
